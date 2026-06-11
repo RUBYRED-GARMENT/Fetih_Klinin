@@ -24,13 +24,8 @@
         body { font-family: 'Inter', 'Cairo', sans-serif; background: var(--bg-color); color: var(--text-main); margin: 0; overflow-x: hidden; }
 
         input::-webkit-outer-spin-button,
-        input::-webkit-inner-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
-        }
-        input[type=number] {
-            -moz-appearance: textfield;
-        }
+        input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; }
 
         #toast {
             position: fixed; top: -100px; left: 50%; transform: translateX(-50%);
@@ -45,6 +40,28 @@
         .btn-nav { background: var(--input-bg); color: var(--text-main); border: 1px solid var(--border); padding: 8px 12px; border-radius: 10px; cursor: pointer; font-weight: 600; }
 
         .container { padding: 20px; max-width: 1200px; margin: 0 auto; }
+
+        /* ── Category cards ── */
+        .category-section { margin-bottom: 20px; }
+        .category-label { font-size: 12px; font-weight: 700; color: var(--text-dim); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 10px; }
+        .category-scroll { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+        .category-scroll::-webkit-scrollbar { height: 4px; }
+        .category-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+        .cat-card {
+            flex-shrink: 0; background: var(--card-bg); border: 2px solid var(--border);
+            border-radius: 14px; padding: 10px 18px; cursor: pointer;
+            font-weight: 700; font-size: 13px; white-space: nowrap;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .cat-card:hover { border-color: var(--ruby-red); }
+        .cat-card.active { border-color: var(--ruby-red); background: rgba(230,57,70,0.12); color: var(--ruby-red); }
+        .cat-card .cat-count {
+            background: var(--input-bg); color: var(--text-dim);
+            border-radius: 20px; padding: 2px 8px; font-size: 11px; font-weight: 600;
+        }
+        .cat-card.active .cat-count { background: rgba(230,57,70,0.2); color: var(--ruby-red); }
+
+        /* ── Stats ── */
         .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 25px; }
         @media (min-width: 768px) { .stats-grid { grid-template-columns: repeat(4, 1fr); } }
         .stat-item { background: var(--card-bg); padding: 15px; border-radius: 18px; text-align: center; cursor: pointer; border: 2px solid transparent; }
@@ -99,12 +116,21 @@
 </header>
 
 <div class="container">
+
+    <!-- Category Filter Cards -->
+    <div class="category-section">
+        <div class="category-label" data-key="catLabel">Kategoriler</div>
+        <div class="category-scroll" id="categoryRow"></div>
+    </div>
+
+    <!-- Stats -->
     <div class="stats-grid">
         <div class="stat-item active" onclick="setFilter('all')"><small data-key="sAll">Toplam</small><b id="c-all">0</b></div>
         <div class="stat-item" onclick="setFilter('available')"><small data-key="sAvail">Stokta</small><b id="c-avail">0</b></div>
         <div class="stat-item" onclick="setFilter('critical')"><small data-key="sCrit">Kritik</small><b id="c-crit">0</b></div>
         <div class="stat-item" onclick="setFilter('out')"><small data-key="sOut">Bitti</small><b id="c-out">0</b></div>
     </div>
+
     <input type="text" id="searchInp" placeholder="Ara..." onkeyup="renderUI()" style="width:100%; padding:15px; border-radius:12px; margin-bottom:20px; background:var(--card-bg); border:1px solid var(--border); color:var(--text-main);">
     <div class="grid" id="invGrid"></div>
 </div>
@@ -139,7 +165,7 @@
 </div>
 
 <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyUBJTWs8X9tI1O4fIeLYEoJzVToAPEacQron58_kIQHx3grd6-5exOW8w095DldHop6g/exec";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzoHzUJ_CaDqRjYqcJd51pc40qFINDk6sVwlp9jg2LB6VSx6iuQaVEoEuDQvlTndGiIIA/exec";
     
     const TRANSLATIONS = {
         tr: {
@@ -151,7 +177,7 @@
             search:"Ara...", successMsg:"Başarıyla İşlendi!",
             amountLabel:"Miktar:", workerRequired:"Personel Kodu Gerekli!",
             noData:"Veri Bulunamadı", reportError:"Rapor Hatası",
-            reportSheetName:"Rapor"
+            reportSheetName:"Rapor", catLabel:"Kategoriler", catAll:"Tümü"
         },
         en: {
             navRep:"Reports", sAll:"Total", sAvail:"In Stock", sCrit:"Critical", sOut:"Empty",
@@ -162,12 +188,13 @@
             search:"Search...", successMsg:"Successfully Dispensed!",
             amountLabel:"Amount:", workerRequired:"Worker Code Required!",
             noData:"No Data Found", reportError:"Report Error",
-            reportSheetName:"Report"
+            reportSheetName:"Report", catLabel:"Categories", catAll:"All"
         }
     };
 
     let inventory = [];
     let currentFilter = 'all';
+    let currentCategory = 'all'; // NEW: active category filter
     let activeItem = null;
     let currentLang = 'tr';
 
@@ -185,10 +212,60 @@
         try { 
             const r = await fetch(SCRIPT_URL); 
             inventory = await r.json(); 
+            renderCategories();
             renderUI(); 
         } catch(e) { console.error(e); } 
         document.getElementById('loader').style.display = 'none'; 
     }
+
+    // ── Build category filter row ──────────────────────────────
+    function renderCategories() {
+        const row = document.getElementById('categoryRow');
+        row.innerHTML = '';
+
+        // Collect unique non-empty categories
+        const catMap = {}; // category -> count
+        inventory.forEach(item => {
+            const cat = (item.kategori || '').trim();
+            if (!cat) return;
+            catMap[cat] = (catMap[cat] || 0) + 1;
+        });
+
+        const categories = Object.keys(catMap);
+        if (categories.length === 0) {
+            document.querySelector('.category-section').style.display = 'none';
+            return;
+        }
+        document.querySelector('.category-section').style.display = 'block';
+
+        // "All" card
+        const totalItems = inventory.length;
+        row.innerHTML = `
+            <div class="cat-card ${currentCategory === 'all' ? 'active' : ''}" onclick="setCategory('all')">
+                <i class="fas fa-th-large"></i>
+                ${t('catAll')}
+                <span class="cat-count">${totalItems}</span>
+            </div>`;
+
+        categories.forEach(cat => {
+            row.innerHTML += `
+                <div class="cat-card ${currentCategory === cat ? 'active' : ''}" onclick="setCategory('${escHtml(cat)}')">
+                    ${escHtml(cat)}
+                    <span class="cat-count">${catMap[cat]}</span>
+                </div>`;
+        });
+    }
+
+    function escHtml(str) {
+        return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
+    function setCategory(cat) {
+        currentCategory = cat;
+        renderCategories();
+        renderUI();
+    }
+    // ──────────────────────────────────────────────────────────
 
     function renderUI() {
         const grid = document.getElementById('invGrid');
@@ -202,11 +279,21 @@
             const isCrit = ratio <= 25 && stock > 0, isOut = stock <= 0;
             counts.all++; if(!isOut) counts.avail++; if(isCrit) counts.crit++; if(isOut) counts.out++;
 
-            if(item.name.toLowerCase().includes(search)) {
+            // Category filter
+            const itemCat = (item.kategori || '').trim();
+            const catMatch = currentCategory === 'all' || itemCat === currentCategory;
+
+            if(catMatch && item.name.toLowerCase().includes(search)) {
                 if(currentFilter==='all' || (currentFilter==='available' && !isOut) || (currentFilter==='critical' && isCrit) || (currentFilter==='out' && isOut)) {
                     grid.innerHTML += `
                         <div class="card" style="border-top: 5px solid ${ratio<=25?'var(--ruby-red)':'var(--success)'}">
-                            <div style="display:flex; justify-content:space-between;"><small>#${item.serial}</small><b>${ratio}%</b></div>
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <small>#${item.serial}</small>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    ${itemCat ? `<span style="background:var(--input-bg); color:var(--text-dim); border-radius:8px; padding:2px 10px; font-size:11px; font-weight:600;">${escHtml(itemCat)}</span>` : ''}
+                                    <b>${ratio}%</b>
+                                </div>
+                            </div>
                             <h3 style="margin:10px 0;">${item.name}</h3>
                             <div class="progress-container"><div class="progress-bar" style="width:${ratio}%; background:${ratio<=25?'var(--ruby-red)':'var(--success)'}"></div></div>
                             <p>${t('stock')}: ${stock} / ${total}</p>
@@ -309,7 +396,6 @@
             if(TRANSLATIONS[currentLang][key]) el.innerText = TRANSLATIONS[currentLang][key];
         });
 
-        // Update report type options
         document.querySelectorAll('[data-key-opt]').forEach(el => {
             const key = el.getAttribute('data-key-opt');
             if(TRANSLATIONS[currentLang][key]) el.innerText = TRANSLATIONS[currentLang][key];
@@ -317,6 +403,7 @@
 
         document.getElementById('searchInp').placeholder = t('search');
         document.getElementById('toastMsg').innerText = t('successMsg');
+        renderCategories();
         renderUI();
     }
 </script>
