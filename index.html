@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="tr" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fetih Klinik | Clinic Pro</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.5/xlsx.full.min.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #0f172a; --card-bg: #1e293b; --text-main: #f8fafc;
+            --text-dim: #94a3b8; --ruby-red: #e63946; --success: #2ecc71;
+            --border: #334155; --input-bg: #0f172a;
+        }
+        [data-theme="light"] {
+            --bg-color: #f1f5f9; --card-bg: #ffffff; --text-main: #1e293b;
+            --text-dim: #64748b; --border: #e2e8f0; --input-bg: #ffffff;
+        }
+
+        * { box-sizing: border-box; transition: 0.2s; }
+        body { font-family: 'Inter', 'Cairo', sans-serif; background: var(--bg-color); color: var(--text-main); margin: 0; overflow-x: hidden; }
+
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+
+        #toast {
+            position: fixed; top: -100px; left: 50%; transform: translateX(-50%);
+            background: var(--success); color: white; padding: 12px 30px; border-radius: 50px;
+            font-weight: 700; z-index: 20000; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            display: flex; align-items: center; gap: 10px; transition: 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        #toast.show { top: 20px; }
+
+        .header { background: var(--card-bg); padding: 12px 25px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 1000; border-bottom: 1px solid var(--border); }
+        .logo { font-size: 22px; font-weight: 800; color: var(--ruby-red); text-decoration: none; }
+        .btn-nav { background: var(--input-bg); color: var(--text-main); border: 1px solid var(--border); padding: 8px 12px; border-radius: 10px; cursor: pointer; font-weight: 600; }
+
+        .container { padding: 20px; max-width: 1200px; margin: 0 auto; }
+        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 25px; }
+        @media (min-width: 768px) { .stats-grid { grid-template-columns: repeat(4, 1fr); } }
+        .stat-item { background: var(--card-bg); padding: 15px; border-radius: 18px; text-align: center; cursor: pointer; border: 2px solid transparent; }
+        .stat-item.active { border-color: var(--ruby-red); background: rgba(230, 57, 70, 0.05); }
+        .stat-item b { display: block; font-size: 26px; color: var(--ruby-red); }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+        .card { background: var(--card-bg); border-radius: 22px; padding: 25px; border: 1px solid var(--border); }
+        
+        .progress-container { background: var(--input-bg); height: 8px; border-radius: 10px; margin: 15px 0; overflow: hidden; }
+        .progress-bar { height: 100%; transition: width 0.5s ease; }
+
+        .qty-wrapper { display: flex; align-items: center; justify-content: space-between; background: var(--input-bg); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 15px; }
+        .qty-btn { background: none; border: none; color: var(--text-main); padding: 10px 18px; cursor: pointer; font-size: 20px; font-weight: bold; }
+        .qty-input { width: 60px; border: none; background: none; color: var(--text-main); text-align: center; font-size: 18px; font-weight: 800; outline: none; }
+
+        .btn-action { width: 100%; background: var(--ruby-red); color: white; padding: 14px; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; }
+        .btn-action:disabled { background: var(--border); cursor: not-allowed; }
+
+        .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
+        .modal-box { background: var(--card-bg); padding: 35px; border-radius: 28px; width: 92%; max-width: 450px; }
+        input, select { width: 100%; padding: 14px; margin: 8px 0; border-radius: 12px; background: var(--input-bg); border: 1px solid var(--border); color: var(--text-main); outline: none;}
+
+        #loader { position: fixed; inset: 0; background: var(--bg-color); display: none; align-items: center; justify-content: center; z-index: 9999; }
+    </style>
+</head>
+<body lang="tr">
+
+<div id="toast"><i class="fas fa-check-circle"></i> <span id="toastMsg">Başarıyla İşlendi!</span></div>
+
+<div id="loginOverlay" style="position:fixed; inset:0; background:var(--bg-color); z-index:10000; display:flex; align-items:center; justify-content:center;">
+    <div class="login-box" style="background:var(--card-bg); padding:40px; border-radius:24px; text-align:center; width:90%; max-width:400px;">
+        <h2>Klinik Girişi</h2>
+        <input type="text" id="loginID" placeholder="Kullanıcı Adı">
+        <input type="password" id="loginPass" placeholder="Şifre">
+        <button class="btn-action" onclick="checkLogin()" style="margin-top:10px;">Giriş Yap</button>
+    </div>
+</div>
+
+<div id="loader"><i class="fas fa-spinner fa-spin fa-3x" style="color:var(--ruby-red)"></i></div>
+
+<header class="header">
+    <a href="#" class="logo">FETIH KLINIK</a>
+    <div class="nav-btns" style="display:flex; gap:10px;">
+        <button class="btn-nav" onclick="openReports()"><i class="fas fa-file-excel"></i> <span data-key="navRep">Raporlar</span></button>
+        <select id="langMenu" onchange="updateLang()" style="width:auto; padding:5px;">
+            <option value="tr">TR</option>
+            <option value="en">EN</option>
+        </select>
+        <button class="btn-nav" onclick="toggleTheme()"><i class="fas fa-adjust"></i></button>
+    </div>
+</header>
+
+<div class="container">
+    <div class="stats-grid">
+        <div class="stat-item active" onclick="setFilter('all')"><small data-key="sAll">Toplam</small><b id="c-all">0</b></div>
+        <div class="stat-item" onclick="setFilter('available')"><small data-key="sAvail">Stokta</small><b id="c-avail">0</b></div>
+        <div class="stat-item" onclick="setFilter('critical')"><small data-key="sCrit">Kritik</small><b id="c-crit">0</b></div>
+        <div class="stat-item" onclick="setFilter('out')"><small data-key="sOut">Bitti</small><b id="c-out">0</b></div>
+    </div>
+    <input type="text" id="searchInp" placeholder="Ara..." onkeyup="renderUI()" style="width:100%; padding:15px; border-radius:12px; margin-bottom:20px; background:var(--card-bg); border:1px solid var(--border); color:var(--text-main);">
+    <div class="grid" id="invGrid"></div>
+</div>
+
+<div class="overlay" id="reportOverlay">
+    <div class="modal-box">
+        <h3 data-key="rTitle">Rapor Merkezi</h3>
+        <select id="reportType" onchange="toggleDateGroup()">
+            <option value="usage" data-key-opt="rUsage">Tüketim Geçmişi (kullanım)</option>
+            <option value="inventory" data-key-opt="rInv">Mevcut Stok (envanter)</option>
+        </select>
+        <div id="dateGroup">
+            <label data-key="rFrom">Başlangıç:</label><input type="date" id="dateFrom">
+            <label data-key="rTo">Bitiş:</label><input type="date" id="dateTo">
+        </div>
+        <button class="btn-action" onclick="generateReport()" style="margin-top:20px;" data-key="rBtn">İndir</button>
+        <button class="btn-action" style="background:none; color:var(--text-dim)" onclick="closeReports()" data-key="rClose">Kapat</button>
+    </div>
+</div>
+
+<div class="overlay" id="orderOverlay">
+    <div class="modal-box">
+        <h3 id="mMedName">Ürün</h3>
+        <p id="mQtyText" style="color:var(--ruby-red); font-weight:800;"></p>
+        <label data-key="wCode">Personel Kodu:</label>
+        <input type="text" id="workerCode" placeholder="Kod">
+        <div style="display:flex; gap:10px; margin-top:10px;">
+            <button class="btn-action" style="background:#475569" onclick="closeOrder()" data-key="bCancel">İptal</button>
+            <button class="btn-action" id="confirmBtn" onclick="processOrder()" data-key="bConfirm">Onayla</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxnBLrU30i_4Id4FD_zR93U8Mxjb_j2jkOhskO4DUINVc1epiejfCKcJHPmzyyqFUyzJw/exec";
+    
+    const TRANSLATIONS = {
+        tr: {
+            navRep:"Raporlar", sAll:"Toplam", sAvail:"Stokta", sCrit:"Kritik", sOut:"Bitti",
+            rTitle:"Rapor Merkezi", rBtn:"İndir", rClose:"Kapat", rFrom:"Başlangıç:", rTo:"Bitiş:",
+            rUsage:"Tüketim Geçmişi (kullanım)", rInv:"Mevcut Stok (envanter)",
+            wCode:"Personel Kodu:", bConfirm:"Onayla", bCancel:"İptal",
+            stock:"Stok", use:"KULLAN", out:"BİTTİ",
+            search:"Ara...", successMsg:"Başarıyla İşlendi!",
+            amountLabel:"Miktar:", workerRequired:"Personel Kodu Gerekli!",
+            noData:"Veri Bulunamadı", reportError:"Rapor Hatası",
+            reportSheetName:"Rapor"
+        },
+        en: {
+            navRep:"Reports", sAll:"Total", sAvail:"In Stock", sCrit:"Critical", sOut:"Empty",
+            rTitle:"Report Center", rBtn:"Download", rClose:"Close", rFrom:"From:", rTo:"To:",
+            rUsage:"Consumption History (usage)", rInv:"Current Inventory (inv)",
+            wCode:"Worker Code:", bConfirm:"Confirm", bCancel:"Cancel",
+            stock:"Stock", use:"USE", out:"OUT",
+            search:"Search...", successMsg:"Successfully Dispensed!",
+            amountLabel:"Amount:", workerRequired:"Worker Code Required!",
+            noData:"No Data Found", reportError:"Report Error",
+            reportSheetName:"Report"
+        }
+    };
+
+    let inventory = [];
+    let currentFilter = 'all';
+    let activeItem = null;
+    let currentLang = 'tr';
+
+    function t(key) { return TRANSLATIONS[currentLang][key] || key; }
+
+    function checkLogin() { 
+        if(document.getElementById('loginID').value === 'clinic' && document.getElementById('loginPass').value === '102030') { 
+            document.getElementById('loginOverlay').style.display = 'none'; 
+            loadData(); 
+        } 
+    }
+
+    async function loadData() { 
+        document.getElementById('loader').style.display = 'flex'; 
+        try { 
+            const r = await fetch(SCRIPT_URL); 
+            inventory = await r.json(); 
+            renderUI(); 
+        } catch(e) { console.error(e); } 
+        document.getElementById('loader').style.display = 'none'; 
+    }
+
+    function renderUI() {
+        const grid = document.getElementById('invGrid');
+        const search = document.getElementById('searchInp').value.toLowerCase();
+        grid.innerHTML = '';
+        let counts = { all:0, avail:0, crit:0, out:0 };
+
+        inventory.forEach(item => {
+            const stock = Number(item.stock), total = Number(item.total);
+            const ratio = Math.round((stock/total)*100) || 0;
+            const isCrit = ratio <= 25 && stock > 0, isOut = stock <= 0;
+            counts.all++; if(!isOut) counts.avail++; if(isCrit) counts.crit++; if(isOut) counts.out++;
+
+            if(item.name.toLowerCase().includes(search)) {
+                if(currentFilter==='all' || (currentFilter==='available' && !isOut) || (currentFilter==='critical' && isCrit) || (currentFilter==='out' && isOut)) {
+                    grid.innerHTML += `
+                        <div class="card" style="border-top: 5px solid ${ratio<=25?'var(--ruby-red)':'var(--success)'}">
+                            <div style="display:flex; justify-content:space-between;"><small>#${item.serial}</small><b>${ratio}%</b></div>
+                            <h3 style="margin:10px 0;">${item.name}</h3>
+                            <div class="progress-container"><div class="progress-bar" style="width:${ratio}%; background:${ratio<=25?'var(--ruby-red)':'var(--success)'}"></div></div>
+                            <p>${t('stock')}: ${stock} / ${total}</p>
+                            <div class="qty-wrapper">
+                                <button class="qty-btn" onclick="adjQty('${item.serial}', -1, ${stock})">-</button>
+                                <input type="number" class="qty-input" id="q-${item.serial}" value="1" onchange="validateQty(this, ${stock})">
+                                <button class="qty-btn" onclick="adjQty('${item.serial}', 1, ${stock})">+</button>
+                            </div>
+                            <button class="btn-action" ${isOut?'disabled':''} onclick="openOrder(${item.serial})">${isOut ? t('out') : t('use')}</button>
+                        </div>`;
+                }
+            }
+        });
+        ['all','avail','crit','out'].forEach(f => document.getElementById(`c-${f}`).innerText = counts[f]);
+    }
+
+    function adjQty(id, d, max) { 
+        const i = document.getElementById(`q-${id}`); 
+        let v = (parseInt(i.value) || 1) + d; 
+        if(v < 1) v = 1; 
+        if(v > max) v = max; 
+        i.value = v; 
+    }
+
+    function validateQty(input, max) {
+        let v = parseInt(input.value);
+        if(isNaN(v) || v < 1) v = 1;
+        if(v > max) v = max;
+        input.value = v;
+    }
+
+    async function generateReport() {
+        const type = document.getElementById('reportType').value;
+        const from = document.getElementById('dateFrom').value;
+        const to = document.getElementById('dateTo').value;
+        document.getElementById('loader').style.display = 'flex';
+        try {
+            let url = `${SCRIPT_URL}?action=${type}&from=${from}&to=${to}`;
+            const response = await fetch(url);
+            const result = await response.json();
+            if(!result || result.length === 0) { 
+                alert(t('noData')); 
+            } else {
+                const ws = XLSX.utils.json_to_sheet(result);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, t('reportSheetName'));
+                XLSX.writeFile(wb, `${type}_rapor_${new Date().toISOString().slice(0,10)}.xlsx`);
+            }
+        } catch(e) { alert(t('reportError')); }
+        document.getElementById('loader').style.display = 'none';
+    }
+
+    async function processOrder() {
+        const code = document.getElementById('workerCode').value;
+        if(!code) return alert(t('workerRequired'));
+        
+        inventory.find(i => i.serial == activeItem.serial).stock -= activeItem.q;
+        renderUI();
+        closeOrder();
+        
+        document.getElementById('toastMsg').innerText = t('successMsg');
+        const toast = document.getElementById('toast');
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 3000);
+
+        fetch(SCRIPT_URL, { 
+            method: 'POST', 
+            mode: 'no-cors', 
+            body: JSON.stringify({ workerCode: code, serial: activeItem.serial, qty: activeItem.q }) 
+        });
+    }
+
+    function openOrder(s) { 
+        const item = inventory.find(i => i.serial == s); 
+        const qtyInput = document.getElementById(`q-${s}`);
+        let qty = parseInt(qtyInput.value) || 1; 
+        
+        if(qty > item.stock) qty = item.stock;
+        if(qty < 1) qty = 1;
+        
+        activeItem = { ...item, q: qty }; 
+        document.getElementById('mMedName').innerText = item.name; 
+        document.getElementById('mQtyText').innerText = `${t('amountLabel')} ${qty}`; 
+        document.getElementById('orderOverlay').style.display = 'flex'; 
+    }
+
+    function openReports() { document.getElementById('reportOverlay').style.display = 'flex'; }
+    function closeReports() { document.getElementById('reportOverlay').style.display = 'none'; }
+    function closeOrder() { document.getElementById('orderOverlay').style.display = 'none'; document.getElementById('workerCode').value = ''; }
+    function toggleDateGroup() { document.getElementById('dateGroup').style.display = document.getElementById('reportType').value === 'usage' ? 'block' : 'none'; }
+    function toggleTheme() { document.documentElement.setAttribute('data-theme', document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'); }
+    function setFilter(f) { currentFilter = f; document.querySelectorAll('.stat-item').forEach(i => i.classList.remove('active')); event.currentTarget.classList.add('active'); renderUI(); }
+    
+    function updateLang() {
+        currentLang = document.getElementById('langMenu').value;
+        document.body.setAttribute('lang', currentLang);
+
+        document.querySelectorAll('[data-key]').forEach(el => {
+            const key = el.getAttribute('data-key');
+            if(TRANSLATIONS[currentLang][key]) el.innerText = TRANSLATIONS[currentLang][key];
+        });
+
+        // Update report type options
+        document.querySelectorAll('[data-key-opt]').forEach(el => {
+            const key = el.getAttribute('data-key-opt');
+            if(TRANSLATIONS[currentLang][key]) el.innerText = TRANSLATIONS[currentLang][key];
+        });
+
+        document.getElementById('searchInp').placeholder = t('search');
+        document.getElementById('toastMsg').innerText = t('successMsg');
+        renderUI();
+    }
+</script>
+</body>
+</html>
