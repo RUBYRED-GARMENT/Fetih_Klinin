@@ -6,6 +6,7 @@
     <title>Fetih Klinik | Clinic Pro</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="pic/logooo.png">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.5/xlsx.full.min.js"></script>
     <style>
         :root {
@@ -13,7 +14,6 @@
             --text-dim: #94a3b8; --ruby-red: #e63946; --success: #2ecc71;
             --border: #334155; --input-bg: #0f172a; --warning: #f59e0b;
         }
-        
         [data-theme="light"] {
             --bg-color: #f1f5f9; --card-bg: #ffffff; --text-main: #1e293b;
             --text-dim: #64748b; --border: #e2e8f0; --input-bg: #ffffff;
@@ -61,18 +61,13 @@
         .stat-item small { font-size: 11px; color: var(--text-dim); }
 
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
-
         .card { background: var(--card-bg); border-radius: 22px; padding: 22px; border: 1px solid var(--border); position: relative; overflow: hidden; }
 
         .progress-container { background: var(--input-bg); height: 8px; border-radius: 10px; margin: 12px 0; overflow: hidden; }
         .progress-bar { height: 100%; transition: width 0.5s ease; }
 
-        /* ── Expiry badge ── */
         .expiry-row { display: flex; align-items: center; gap: 6px; margin: 8px 0 12px; }
-        .expiry-badge {
-            display: inline-flex; align-items: center; gap: 5px;
-            border-radius: 8px; padding: 5px 12px; font-size: 12px; font-weight: 700;
-        }
+        .expiry-badge { display: inline-flex; align-items: center; gap: 5px; border-radius: 8px; padding: 5px 12px; font-size: 12px; font-weight: 700; }
         .expiry-ok   { background: rgba(46,204,113,0.15);  color: #2ecc71; }
         .expiry-warn { background: rgba(245,158,11,0.15);  color: #f59e0b; }
         .expiry-bad  { background: rgba(230,57,70,0.15);   color: #e63946; }
@@ -251,7 +246,6 @@ async function loadData() {
     try {
         const r = await fetch(SCRIPT_URL);
         inventory = await r.json();
-        console.log("Sample item:", JSON.stringify(inventory[0])); // debug
         renderCategories();
         renderUI();
     } catch(e) { console.error(e); }
@@ -261,8 +255,17 @@ async function loadData() {
 // ── Expiry helpers ────────────────────────────────────────────
 function getExpiryInfo(expiryStr) {
     if (!expiryStr || expiryStr === "") return null;
-    const exp = new Date(expiryStr);
+
+    // تحويل DD-MM-YYYY أو DD/MM/YYYY إلى YYYY-MM-DD
+    let normalized = expiryStr.trim();
+    const dmyMatch = normalized.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);
+    if (dmyMatch) {
+        normalized = dmyMatch[3] + "-" + dmyMatch[2].padStart(2,'0') + "-" + dmyMatch[1].padStart(2,'0');
+    }
+
+    const exp = new Date(normalized);
     if (isNaN(exp.getTime())) return null;
+
     const today = new Date();
     today.setHours(0,0,0,0);
     exp.setHours(0,0,0,0);
@@ -273,15 +276,15 @@ function getExpiryInfo(expiryStr) {
 function expiryBadgeHTML(expiryStr) {
     const info = getExpiryInfo(expiryStr);
     if (!info) {
-        return `<div class="expiry-row"><span class="expiry-badge expiry-none"><i class="fas fa-calendar"></i> ${t('expNone')}</span></div>`;
+        return '<div class="expiry-row"><span class="expiry-badge expiry-none"><i class="fas fa-calendar"></i> ' + t('expNone') + '</span></div>';
     }
     const dateFormatted = info.date.toLocaleDateString('tr-TR');
     if (info.daysLeft < 0) {
-        return `<div class="expiry-row"><span class="expiry-badge expiry-bad"><i class="fas fa-times-circle"></i> ${t('expExpired')} — ${dateFormatted}</span></div>`;
+        return '<div class="expiry-row"><span class="expiry-badge expiry-bad"><i class="fas fa-times-circle"></i> ' + t('expExpired') + ' — ' + dateFormatted + '</span></div>';
     } else if (info.daysLeft <= 30) {
-        return `<div class="expiry-row"><span class="expiry-badge expiry-warn"><i class="fas fa-exclamation-triangle"></i> ${info.daysLeft} ${t('expDaysLeft')} — ${dateFormatted}</span></div>`;
+        return '<div class="expiry-row"><span class="expiry-badge expiry-warn"><i class="fas fa-exclamation-triangle"></i> ' + info.daysLeft + ' ' + t('expDaysLeft') + ' — ' + dateFormatted + '</span></div>';
     } else {
-        return `<div class="expiry-row"><span class="expiry-badge expiry-ok"><i class="fas fa-calendar-check"></i> ${dateFormatted}</span></div>`;
+        return '<div class="expiry-row"><span class="expiry-badge expiry-ok"><i class="fas fa-calendar-check"></i> ' + dateFormatted + '</span></div>';
     }
 }
 // ─────────────────────────────────────────────────────────────
@@ -293,7 +296,7 @@ function escHtml(str) {
 function renderCategories() {
     const row = document.getElementById('categoryRow');
     const catMap = {};
-    inventory.forEach(item => {
+    inventory.forEach(function(item) {
         const cat = (item.kategori || '').trim();
         if (cat) catMap[cat] = (catMap[cat] || 0) + 1;
     });
@@ -303,16 +306,12 @@ function renderCategories() {
         return;
     }
     document.querySelector('.category-section').style.display = 'block';
-    row.innerHTML = `
-        <div class="cat-card ${currentCategory==='all'?'active':''}" onclick="setCategory('all')">
-            <i class="fas fa-th-large"></i> ${t('catAll')}
-            <span class="cat-count">${inventory.length}</span>
-        </div>`;
-    categories.forEach(cat => {
-        row.innerHTML += `
-            <div class="cat-card ${currentCategory===cat?'active':''}" onclick="setCategory('${escHtml(cat)}')">
-                ${escHtml(cat)} <span class="cat-count">${catMap[cat]}</span>
-            </div>`;
+    row.innerHTML = '<div class="cat-card ' + (currentCategory==='all'?'active':'') + '" onclick="setCategory(\'all\')">'
+        + '<i class="fas fa-th-large"></i> ' + t('catAll')
+        + '<span class="cat-count">' + inventory.length + '</span></div>';
+    categories.forEach(function(cat) {
+        row.innerHTML += '<div class="cat-card ' + (currentCategory===cat?'active':'') + '" onclick="setCategory(\'' + escHtml(cat) + '\')">'
+            + escHtml(cat) + '<span class="cat-count">' + catMap[cat] + '</span></div>';
     });
 }
 
@@ -322,146 +321,146 @@ function renderUI() {
     const grid = document.getElementById('invGrid');
     const search = document.getElementById('searchInp').value.toLowerCase();
     grid.innerHTML = '';
-    let counts = { all:0, avail:0, crit:0, out:0, expwarn:0, expbad:0 };
+    var counts = { all:0, avail:0, crit:0, out:0, expwarn:0, expbad:0 };
 
-    inventory.forEach(item => {
+    inventory.forEach(function(item) {
         const stock = Number(item.stock);
         const total = Number(item.total);
         const ratio = total > 0 ? Math.round((stock/total)*100) : 0;
-        const isCrit   = ratio <= 25 && stock > 0;
-        const isOut    = stock <= 0;
-        const expInfo  = getExpiryInfo(item.expiry);
+        const isCrit    = ratio <= 25 && stock > 0;
+        const isOut     = stock <= 0;
+        const expInfo   = getExpiryInfo(item.expiry);
         const isExpWarn = expInfo && expInfo.daysLeft >= 0 && expInfo.daysLeft <= 30;
         const isExpBad  = expInfo && expInfo.daysLeft < 0;
 
         counts.all++;
-        if (!isOut) counts.avail++;
-        if (isCrit) counts.crit++;
-        if (isOut)  counts.out++;
-        if (isExpWarn) counts.expwarn++;
-        if (isExpBad)  counts.expbad++;
+        if (!isOut)     counts.avail++;
+        if (isCrit)     counts.crit++;
+        if (isOut)      counts.out++;
+        if (isExpWarn)  counts.expwarn++;
+        if (isExpBad)   counts.expbad++;
 
         const itemCat  = (item.kategori || '').trim();
         const catMatch = currentCategory === 'all' || itemCat === currentCategory;
 
         const filterMatch =
-            currentFilter === 'all'      ||
-            (currentFilter === 'available' && !isOut)    ||
-            (currentFilter === 'critical'  && isCrit)    ||
-            (currentFilter === 'out'       && isOut)     ||
-            (currentFilter === 'expiring'  && isExpWarn) ||
+            currentFilter === 'all'                          ||
+            (currentFilter === 'available' && !isOut)        ||
+            (currentFilter === 'critical'  && isCrit)        ||
+            (currentFilter === 'out'       && isOut)         ||
+            (currentFilter === 'expiring'  && isExpWarn)     ||
             (currentFilter === 'expired'   && isExpBad);
 
         if (!catMatch || !filterMatch) return;
         if (!item.name.toLowerCase().includes(search)) return;
 
-        // border color priority: expired > low stock > warn > ok
-        // border color = stock status only
-        let borderColor = 'var(--success)';
+        // بوردر الكارت = الكمية بس
+        var borderColor = 'var(--success)';
         if (isCrit) borderColor = 'var(--warning)';
         if (isOut)  borderColor = 'var(--ruby-red)';
 
-        grid.innerHTML += `
-            <div class="card" style="border-top:5px solid ${borderColor}">
-                <div style="display:flex;justify-content:space-between;align-items:center;">
-                    <small style="color:var(--text-dim)">#${item.serial}</small>
-                    <div style="display:flex;align-items:center;gap:8px;">
-                        ${itemCat ? `<span style="background:var(--input-bg);color:var(--text-dim);border-radius:8px;padding:2px 10px;font-size:11px;font-weight:600;">${escHtml(itemCat)}</span>` : ''}
-                        <b>${ratio}%</b>
-                    </div>
-                </div>
-                <h3 style="margin:10px 0 4px;">${escHtml(item.name)}</h3>
-                ${expiryBadgeHTML(item.expiry)}
-                <div class="progress-container">
-                    <div class="progress-bar" style="width:${ratio}%;background:${ratio<=25?'var(--ruby-red)':'var(--success)'}"></div>
-                </div>
-                <p style="margin:0 0 12px;color:var(--text-dim);font-size:14px;">${t('stock')}: <b style="color:var(--text-main)">${stock} / ${total}</b></p>
-                <div class="qty-wrapper">
-                    <button class="qty-btn" onclick="adjQty('${item.serial}',-1,${stock})">−</button>
-                    <input type="number" class="qty-input" id="q-${item.serial}" value="1" onchange="validateQty(this,${stock})">
-                    <button class="qty-btn" onclick="adjQty('${item.serial}',1,${stock})">+</button>
-                </div>
-                <button class="btn-action" ${isOut?'disabled':''} onclick="openOrder(${item.serial})">
-                    ${isOut ? t('out') : t('use')}
-                </button>
-            </div>`;
+        grid.innerHTML +=
+            '<div class="card" style="border-top:5px solid ' + borderColor + '">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+                    '<small style="color:var(--text-dim)">#' + item.serial + '</small>' +
+                    '<div style="display:flex;align-items:center;gap:8px;">' +
+                        (itemCat ? '<span style="background:var(--input-bg);color:var(--text-dim);border-radius:8px;padding:2px 10px;font-size:11px;font-weight:600;">' + escHtml(itemCat) + '</span>' : '') +
+                        '<b>' + ratio + '%</b>' +
+                    '</div>' +
+                '</div>' +
+                '<h3 style="margin:10px 0 4px;">' + escHtml(item.name) + '</h3>' +
+                expiryBadgeHTML(item.expiry) +
+                '<div class="progress-container">' +
+                    '<div class="progress-bar" style="width:' + ratio + '%;background:' + (ratio<=25?'var(--ruby-red)':'var(--success)') + '"></div>' +
+                '</div>' +
+                '<p style="margin:0 0 12px;color:var(--text-dim);font-size:14px;">' + t('stock') + ': <b style="color:var(--text-main)">' + stock + ' / ' + total + '</b></p>' +
+                '<div class="qty-wrapper">' +
+                    '<button class="qty-btn" onclick="adjQty(\'' + item.serial + '\',-1,' + stock + ')">−</button>' +
+                    '<input type="number" class="qty-input" id="q-' + item.serial + '" value="1" onchange="validateQty(this,' + stock + ')">' +
+                    '<button class="qty-btn" onclick="adjQty(\'' + item.serial + '\',1,' + stock + ')">+</button>' +
+                '</div>' +
+                '<button class="btn-action" ' + (isOut?'disabled':'') + ' onclick="openOrder(' + item.serial + ')">' +
+                    (isOut ? t('out') : t('use')) +
+                '</button>' +
+            '</div>';
     });
 
-    document.getElementById('c-all').innerText    = counts.all;
-    document.getElementById('c-avail').innerText  = counts.avail;
-    document.getElementById('c-crit').innerText   = counts.crit;
-    document.getElementById('c-out').innerText    = counts.out;
+    document.getElementById('c-all').innerText     = counts.all;
+    document.getElementById('c-avail').innerText   = counts.avail;
+    document.getElementById('c-crit').innerText    = counts.crit;
+    document.getElementById('c-out').innerText     = counts.out;
     document.getElementById('c-expwarn').innerText = counts.expwarn;
     document.getElementById('c-expbad').innerText  = counts.expbad;
 }
 
 function adjQty(id, d, max) {
-    const i = document.getElementById(`q-${id}`);
-    let v = (parseInt(i.value) || 1) + d;
-    if (v < 1) v = 1; if (v > max) v = max;
+    var i = document.getElementById('q-' + id);
+    var v = (parseInt(i.value) || 1) + d;
+    if (v < 1) v = 1;
+    if (v > max) v = max;
     i.value = v;
 }
+
 function validateQty(input, max) {
-    let v = parseInt(input.value);
+    var v = parseInt(input.value);
     if (isNaN(v) || v < 1) v = 1;
     if (v > max) v = max;
     input.value = v;
 }
 
 function openOrder(s) {
-    const item = inventory.find(i => i.serial == s);
-    const qtyInput = document.getElementById(`q-${s}`);
-    let qty = parseInt(qtyInput.value) || 1;
+    var item = inventory.find(function(i) { return i.serial == s; });
+    var qtyInput = document.getElementById('q-' + s);
+    var qty = parseInt(qtyInput.value) || 1;
     if (qty > item.stock) qty = item.stock;
     if (qty < 1) qty = 1;
-    activeItem = { ...item, q: qty };
+    activeItem = Object.assign({}, item, { q: qty });
 
-    document.getElementById('mMedName').innerText  = item.name;
-    document.getElementById('mQtyText').innerText  = `${t('amountLabel')} ${qty}`;
+    document.getElementById('mMedName').innerText = item.name;
+    document.getElementById('mQtyText').innerText = t('amountLabel') + ' ' + qty;
 
-    // expiry warning in modal
-    const expInfo = getExpiryInfo(item.expiry);
-    const wrap = document.getElementById('mExpiryWrap');
+    var expInfo = getExpiryInfo(item.expiry);
+    var wrap = document.getElementById('mExpiryWrap');
     if (!expInfo) {
         wrap.innerHTML = '';
     } else if (expInfo.daysLeft < 0) {
-        wrap.innerHTML = `<span class="expiry-badge expiry-bad"><i class="fas fa-times-circle"></i> ${t('expExpired')}</span>`;
+        wrap.innerHTML = '<span class="expiry-badge expiry-bad"><i class="fas fa-times-circle"></i> ' + t('expExpired') + '</span>';
     } else if (expInfo.daysLeft <= 30) {
-        wrap.innerHTML = `<span class="expiry-badge expiry-warn"><i class="fas fa-exclamation-triangle"></i> ${expInfo.daysLeft} ${t('expDaysLeft')}</span>`;
+        wrap.innerHTML = '<span class="expiry-badge expiry-warn"><i class="fas fa-exclamation-triangle"></i> ' + expInfo.daysLeft + ' ' + t('expDaysLeft') + '</span>';
     } else {
-        wrap.innerHTML = `<span class="expiry-badge expiry-ok"><i class="fas fa-calendar-check"></i> ${t('expOk')}</span>`;
+        wrap.innerHTML = '<span class="expiry-badge expiry-ok"><i class="fas fa-calendar-check"></i> ' + t('expOk') + '</span>';
     }
 
     document.getElementById('orderOverlay').style.display = 'flex';
 }
 
 async function processOrder() {
-    const code = document.getElementById('workerCode').value;
+    var code = document.getElementById('workerCode').value;
     if (!code) return alert(t('workerRequired'));
-    inventory.find(i => i.serial == activeItem.serial).stock -= activeItem.q;
+    inventory.find(function(i) { return i.serial == activeItem.serial; }).stock -= activeItem.q;
     renderUI();
     closeOrder();
     document.getElementById('toastMsg').innerText = t('successMsg');
-    const toast = document.getElementById('toast');
+    var toast = document.getElementById('toast');
     toast.classList.add('show');
-    setTimeout(() => toast.classList.remove('show'), 3000);
+    setTimeout(function() { toast.classList.remove('show'); }, 3000);
     fetch(SCRIPT_URL, { method:'POST', mode:'no-cors', body: JSON.stringify({ workerCode: code, serial: activeItem.serial, qty: activeItem.q }) });
 }
 
 async function generateReport() {
-    const type = document.getElementById('reportType').value;
-    const from = document.getElementById('dateFrom').value;
-    const to   = document.getElementById('dateTo').value;
+    var type = document.getElementById('reportType').value;
+    var from = document.getElementById('dateFrom').value;
+    var to   = document.getElementById('dateTo').value;
     document.getElementById('loader').style.display = 'flex';
     try {
-        const r = await fetch(`${SCRIPT_URL}?action=${type}&from=${from}&to=${to}`);
-        const result = await r.json();
+        var r = await fetch(SCRIPT_URL + '?action=' + type + '&from=' + from + '&to=' + to);
+        var result = await r.json();
         if (!result || result.length === 0) { alert(t('noData')); }
         else {
-            const ws = XLSX.utils.json_to_sheet(result);
-            const wb = XLSX.utils.book_new();
+            var ws = XLSX.utils.json_to_sheet(result);
+            var wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, t('reportSheetName'));
-            XLSX.writeFile(wb, `${type}_rapor_${new Date().toISOString().slice(0,10)}.xlsx`);
+            XLSX.writeFile(wb, type + '_rapor_' + new Date().toISOString().slice(0,10) + '.xlsx');
         }
     } catch(e) { alert(t('reportError')); }
     document.getElementById('loader').style.display = 'none';
@@ -475,7 +474,7 @@ function toggleTheme() { document.documentElement.setAttribute('data-theme', doc
 
 function setFilter(f, el) {
     currentFilter = f;
-    document.querySelectorAll('.stat-item').forEach(i => i.classList.remove('active'));
+    document.querySelectorAll('.stat-item').forEach(function(i) { i.classList.remove('active'); });
     el.classList.add('active');
     renderUI();
 }
@@ -483,12 +482,12 @@ function setFilter(f, el) {
 function updateLang() {
     currentLang = document.getElementById('langMenu').value;
     document.body.setAttribute('lang', currentLang);
-    document.querySelectorAll('[data-key]').forEach(el => {
-        const k = el.getAttribute('data-key');
+    document.querySelectorAll('[data-key]').forEach(function(el) {
+        var k = el.getAttribute('data-key');
         if (TRANSLATIONS[currentLang][k]) el.innerText = TRANSLATIONS[currentLang][k];
     });
-    document.querySelectorAll('[data-key-opt]').forEach(el => {
-        const k = el.getAttribute('data-key-opt');
+    document.querySelectorAll('[data-key-opt]').forEach(function(el) {
+        var k = el.getAttribute('data-key-opt');
         if (TRANSLATIONS[currentLang][k]) el.innerText = TRANSLATIONS[currentLang][k];
     });
     document.getElementById('searchInp').placeholder = t('search');
